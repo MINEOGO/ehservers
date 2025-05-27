@@ -1,79 +1,93 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Emergency Hamburg Servers</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #111;
-      color: #fff;
-      padding: 20px;
-      max-width: 900px;
-      margin: auto;
-    }
-    .server-card {
-      background: #1e1e1e;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #000;
-    }
-    .avatar {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-    }
-    .social-links a {
-      margin-right: 10px;
-      color: #00bfff;
-      text-decoration: none;
-    }
-    h1 {
-      margin-bottom: 30px;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <h1>Emergency Hamburg Servers</h1>
-  <div id="servers">Loading servers...</div>
+async function loadServers() {
+  const container = document.getElementById("servers");
+  container.innerHTML = "Loading servers..."; // Initial loading message
 
-  <script>
-    async function loadServers() {
-      const res = await fetch("http://185.58.157.203:7676/servers");
-      const data = await res.json();
-      const container = document.getElementById("servers");
-      container.innerHTML = "";
+  try {
+    const res = await fetch("http://185.58.157.203:7676/servers");
 
-      if (!Array.isArray(data)) {
-        container.innerHTML = "<p>No servers found or API error.</p>";
-        return;
+    if (!res.ok) {
+      // res.ok is false if HTTP status is 4xx or 5xx
+      let errorText = `<p>Error fetching servers: ${res.status} ${res.statusText}</p>`;
+      try {
+        // Try to get more detailed error from API response body
+        const errorData = await res.text(); // Use .text() in case it's not JSON
+        errorText += `<p>Server response: <pre>${errorData.substring(0, 500)}</pre></p>`; // Show first 500 chars
+      } catch (e) { /* Ignore if error body can't be read */ }
+      container.innerHTML = errorText;
+      console.error("API Error:", res.status, res.statusText);
+      return;
+    }
+
+    const data = await res.json();
+    
+    if (!Array.isArray(data)) {
+      container.innerHTML = "<p>No valid server data found or API returned an unexpected format.</p>";
+      console.warn("API did not return an array:", data);
+      return;
+    }
+
+    if (data.length === 0) {
+      container.innerHTML = "<p>No servers are currently listed.</p>";
+      return;
+    }
+    
+    container.innerHTML = ""; // Clear "Loading servers..."
+
+    data.forEach(server => {
+      const card = document.createElement("div");
+      card.className = "server-card";
+
+      // Use defaults for potentially missing data to prevent errors
+      const serverName = server.serverName || "Unnamed Server";
+      const serverDescription = (server.serverDescription || "No description available.").replace(/\r\n/g, "<br>");
+      const ownerName = server.ownerName || "Unknown Owner";
+      const ownerProfileUrl = server.ownerProfileUrl || "https://via.placeholder.com/60/000000/FFFFFF/?text=No+Avatar"; // Default placeholder
+      const currentPlayers = server.currentPlayers !== undefined ? server.currentPlayers : "?";
+      const maxPlayers = server.maxPlayers !== undefined ? server.maxPlayers : "?";
+
+      let socialLinksHTML = "";
+      if (server.socialLinks) {
+        if (server.socialLinks.Discord) {
+          socialLinksHTML += `<a href="https://discord.gg/${server.socialLinks.Discord}" target="_blank" rel="noopener noreferrer">Discord</a>`;
+        }
+        if (server.socialLinks.YouTube) {
+          // Ensure YouTube link is a full URL
+          let ytLink = server.socialLinks.YouTube;
+          if (!ytLink.startsWith('http://') && !ytLink.startsWith('https://')) {
+            ytLink = 'https://' + ytLink;
+          }
+          socialLinksHTML += `<a href="${ytLink}" target="_blank" rel="noopener noreferrer">YouTube</a>`;
+        }
+        if (server.socialLinks.X) {
+          // Remove @ if present for X links
+          let xHandle = server.socialLinks.X.replace(/^@/, '');
+          socialLinksHTML += `<a href="https://x.com/${xHandle}" target="_blank" rel="noopener noreferrer">X (Twitter)</a>`;
+        }
       }
 
-      data.forEach(server => {
-        const card = document.createElement("div");
-        card.className = "server-card";
+      card.innerHTML = `
+        <h2>${serverName}</h2>
+        <p>${serverDescription}</p>
+        <p><strong>Owner:</strong> ${ownerName}</p>
+        <img src="${ownerProfileUrl}" class="avatar" alt="${ownerName} Avatar" onerror="this.onerror=null; this.src='https://via.placeholder.com/60/000000/FFFFFF/?text=No+Avatar';"/>
+        <p><strong>Players:</strong> ${currentPlayers} / ${maxPlayers}</p>
+        <div class="social-links">
+          ${socialLinksHTML.trim() ? socialLinksHTML : 'No social links provided.'}
+        </div>
+      `;
 
-        card.innerHTML = `
-          <h2>${server.serverName}</h2>
-          <p>${server.serverDescription.replace(/\r\n/g, "<br>")}</p>
-          <p><strong>Owner:</strong> ${server.ownerName}</p>
-          <img src="${server.ownerProfileUrl}" class="avatar" alt="Owner Avatar"/>
-          <p><strong>Players:</strong> ${server.currentPlayers} / ${server.maxPlayers}</p>
-          <div class="social-links">
-            ${server.socialLinks?.Discord ? `<a href="https://discord.gg/${server.socialLinks.Discord}" target="_blank">Discord</a>` : ""}
-            ${server.socialLinks?.YouTube ? `<a href="${server.socialLinks.YouTube}" target="_blank">YouTube</a>` : ""}
-            ${server.socialLinks?.X ? `<a href="https://x.com/${server.socialLinks.X}" target="_blank">X (Twitter)</a>` : ""}
-          </div>
-        `;
+      container.appendChild(card);
+    });
 
-        container.appendChild(card);
-      });
+  } catch (error) {
+    // This catches network errors (fetch fails to connect) or JSON parsing errors
+    console.error("Error in loadServers function:", error);
+    container.innerHTML = "<p>Could not load servers. Please check your internet connection or try again later.</p>";
+    if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+        // This specific TypeError often indicates a network or CORS issue.
+        container.innerHTML += "<p>This might be a network problem (e.g., API is down, no internet) or a browser security restriction (like Mixed Content or CORS). Check the browser console (F12) for more details.</p>";
     }
+  }
+}
 
-    loadServers();
-  </script>
-</body>
-</html>
+loadServers();
