@@ -1,5 +1,5 @@
 // --- Configuration ---
-const API_ENDPOINT = "http://127.0.0.1:1111/"; // HTTPS endpoint
+const API_ENDPOINT = "http://127.0.0.1:1111/"; // UPDATED HTTP endpoint
 const FETCH_TIMEOUT_MS = 10000; // 10 seconds timeout
 
 // --- DOM Elements ---
@@ -24,11 +24,9 @@ function logMessage(message, type = "info") {
   }
 
   const p = document.createElement("p");
-  // Sanitize message before setting textContent for consistency, though textContent is inherently safe
   p.textContent = `[${new Date().toLocaleTimeString()}] ${sanitizeHTML(message)}`;
   p.classList.add(type);
   logsDiv.appendChild(p);
-  // Scroll to bottom of logs
   logsDiv.scrollTop = logsDiv.scrollHeight;
 }
 
@@ -53,10 +51,9 @@ function displayErrorMessage(title, message, details = "") {
 function createServerCard(server, index) {
   const card = document.createElement("div");
   card.className = "server-card";
-  card.style.setProperty('--card-index', index); // For staggered animation
+  card.style.setProperty('--card-index', index);
 
   const serverName = sanitizeHTML(server.serverName || "Unnamed Server");
-  // Convert newlines to <br> but also sanitize the description parts
   const serverDescription = (server.serverDescription || "No description available.")
                             .split(/\r\n|\r|\n/)
                             .map(line => sanitizeHTML(line))
@@ -81,7 +78,7 @@ function createServerCard(server, index) {
     }
     if (server.socialLinks.X) {
       let xHandle = sanitizeHTML(server.socialLinks.X.replace(/^@/, ''));
-      if(xHandle) socialLinksHTML += ` <a href="https://x.com/${xHandle}" target="_blank" rel="noopener noreferrer" title="X (Twitter)"><i class="fab fa-xing"></i></a>`; // Using X icon, or fa-twitter
+      if(xHandle) socialLinksHTML += ` <a href="https://x.com/${xHandle}" target="_blank" rel="noopener noreferrer" title="X (Twitter)"><i class="fab fa-xing"></i></a>`;
     }
   }
 
@@ -109,7 +106,6 @@ async function loadServers() {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
-    // This log might be redundant if the catch block for AbortError also logs, but good for clarity.
     logMessage(`Fetch request to ${API_ENDPOINT} timed out after ${FETCH_TIMEOUT_MS / 1000} seconds.`, "error");
   }, FETCH_TIMEOUT_MS);
 
@@ -159,7 +155,7 @@ async function loadServers() {
       return;
     }
 
-    serversContainer.innerHTML = ""; // Clear loading/error messages
+    serversContainer.innerHTML = "";
     logMessage(`Found ${data.length} servers. Rendering cards...`, "success");
 
     data.forEach((server, index) => {
@@ -187,13 +183,12 @@ async function loadServers() {
       errorDetails = `
         Possible reasons:
         <ul>
-          <li>The backend server is not running or is unreachable.</li>
-          <li>A firewall might be blocking the connection.</li>
-          <li>Network connectivity issues (check your internet).</li>
-          <li><strong>If using a self-signed SSL certificate:</strong> You MUST visit <a href="${API_ENDPOINT}" target="_blank" rel="noopener noreferrer">${API_ENDPOINT}</a> directly in your browser and manually accept the security warning/exception. Browsers prevent JavaScript from bypassing this. After accepting, refresh this page.</li>
+          <li>The backend server is not running or is unreachable at ${API_ENDPOINT}.</li>
+          <li>A firewall might be blocking the connection to ${API_ENDPOINT}.</li>
+          <li><strong>CORS Policy:</strong> If this page is served from a different origin than the API, the server at ${API_ENDPOINT} must be configured with appropriate CORS headers (e.g., 'Access-Control-Allow-Origin: *' or the specific origin of this page).</li>
         </ul>
-        Check the browser console (F12) for more specific network errors (e.g., NET::ERR_CERT_AUTHORITY_INVALID, NET::ERR_CONNECTION_REFUSED).`;
-      logMessage(`"Failed to fetch" error: ${error.message}. This often indicates a network issue, firewall, or an unaccepted self-signed SSL certificate.`, "error");
+        Check the browser console (F12) for more specific network errors (e.g., NET::ERR_CONNECTION_REFUSED, CORS errors).`;
+      logMessage(`"Failed to fetch" error: ${error.message}. This often indicates the server is down, a network issue, or a CORS misconfiguration.`, "error");
     } else {
       logMessage(`An unexpected JavaScript error occurred: ${error.message}`, "error");
     }
