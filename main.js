@@ -1,5 +1,5 @@
 // --- Configuration ---
-const API_ENDPOINT = "https://growagardenstonks.pythonanywhere.com/servers"; // HTTPS endpoint
+const API_ENDPOINT = "http://127.0.0.1:1111/"; // HTTPS endpoint
 const FETCH_TIMEOUT_MS = 10000; // 10 seconds timeout
 
 // --- DOM Elements ---
